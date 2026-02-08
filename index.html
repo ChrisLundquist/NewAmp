@@ -29,9 +29,31 @@
         <input type="range" id="volume" min="0" max="100" value="80" />
       </div>
       <select id="preset-select"></select>
+      <button id="editor-toggle" class="transport-btn" title="Shader Editor">{ }</button>
       <button id="fullscreen-btn" class="transport-btn" title="Fullscreen">&#x26F6;</button>
     </div>
     <div id="track-name" class="track-name">No file loaded</div>
+  </div>
+
+  <!-- Shader Editor Panel -->
+  <div id="editor-panel" class="hidden">
+    <div id="editor-toolbar">
+      <button id="editor-close" class="editor-btn" title="Close">&times;</button>
+      <input type="text" id="shader-name" value="Custom Shader" placeholder="Shader name" />
+      <div class="toolbar-spacer"></div>
+      <button id="new-preset" class="editor-btn" title="New shader">New</button>
+      <button id="save-preset" class="editor-btn" title="Save to browser">Save</button>
+      <button id="delete-preset" class="editor-btn danger" title="Delete preset">Delete</button>
+      <span class="toolbar-sep"></span>
+      <button id="export-preset" class="editor-btn" title="Export as JSON">Export</button>
+      <label class="editor-btn" title="Import JSON preset">
+        Import
+        <input type="file" id="import-preset" accept=".json" hidden />
+      </label>
+    </div>
+    <div id="monaco-container"></div>
+    <div id="shader-errors"></div>
+    <div id="uniform-inspector"></div>
   </div>
 
   <script type="module" src="/src/main.ts"></script>

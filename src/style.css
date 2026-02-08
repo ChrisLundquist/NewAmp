@@ -21,6 +21,19 @@ html, body {
   width: 100%;
   height: 100%;
   display: block;
+  transition: width 0.25s ease;
+}
+
+body.editor-open #viz-canvas {
+  width: calc(100% - var(--editor-width));
+}
+
+body.editor-open #controls {
+  right: var(--editor-width);
+}
+
+:root {
+  --editor-width: 480px;
 }
 
 /* ── Drop overlay ── */
@@ -224,4 +237,173 @@ html, body {
 #preset-select option {
   background: #1a1a2e;
   color: #ccc;
+}
+
+/* ── Editor toggle button ── */
+#editor-toggle {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: bold;
+  width: auto;
+  padding: 0 8px;
+}
+
+/* ── Editor Panel ── */
+#editor-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: var(--editor-width);
+  height: 100%;
+  background: #1e1e1e;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #333;
+  transition: transform 0.25s ease;
+}
+
+#editor-panel.hidden {
+  transform: translateX(100%);
+  pointer-events: none;
+}
+
+/* ── Editor Toolbar ── */
+#editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #252526;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+#shader-name {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #ccc;
+  font-size: 0.8rem;
+  padding: 3px 6px;
+  min-width: 0;
+  width: 140px;
+}
+
+#shader-name:focus {
+  border-color: #555;
+  outline: none;
+  background: #2d2d2d;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: #444;
+  margin: 0 2px;
+}
+
+.editor-btn {
+  padding: 3px 10px;
+  background: #333;
+  border: 1px solid #444;
+  border-radius: 3px;
+  color: #ccc;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.15s;
+}
+
+.editor-btn:hover {
+  background: #444;
+}
+
+.editor-btn.danger:hover {
+  background: #6b2020;
+  border-color: #933;
+}
+
+/* ── Monaco Container ── */
+#monaco-container {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Shader Errors ── */
+#shader-errors {
+  flex-shrink: 0;
+  max-height: 80px;
+  overflow-y: auto;
+  font-size: 0.75rem;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  background: #1c1010;
+  color: #f48771;
+  padding: 0;
+  border-top: 1px solid #333;
+}
+
+#shader-errors:empty {
+  display: none;
+}
+
+#shader-errors .error-line {
+  padding: 2px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ── Uniform Inspector ── */
+#uniform-inspector {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  background: #252526;
+  border-top: 1px solid #333;
+  font-size: 0.75rem;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+}
+
+.inspector-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 20px;
+}
+
+.inspector-label {
+  width: 70px;
+  color: #888;
+  flex-shrink: 0;
+}
+
+.inspector-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.inspector-bar {
+  height: 100%;
+  border-radius: 3px;
+  width: 0;
+  transition: width 0.05s linear;
+}
+
+.inspector-value {
+  width: 36px;
+  text-align: right;
+  color: #aaa;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.inspector-time {
+  margin-left: auto;
 }
