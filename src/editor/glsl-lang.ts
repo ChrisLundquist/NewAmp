@@ -111,11 +111,12 @@ export function registerGLSL() {
 
   // Register NewAmp-specific completions for shader uniforms
   monaco.languages.registerCompletionItemProvider('glsl', {
-    provideCompletionItems: (_model, position) => {
+    provideCompletionItems: (model, position) => {
+      const word = model.getWordUntilPosition(position);
       const range = {
         startLineNumber: position.lineNumber,
         endLineNumber: position.lineNumber,
-        startColumn: position.column,
+        startColumn: word.startColumn,
         endColumn: position.column,
       };
       const suggestions: monaco.languages.CompletionItem[] = [
