@@ -17,6 +17,8 @@ export interface AudioData {
   bpm: number;
 }
 
+const BEAT_HISTORY = 64;
+
 /**
  * Wraps an AnalyserNode and extracts per-frame audio features.
  *
@@ -31,17 +33,23 @@ export class Analyzer {
   private analyser: AnalyserNode;
   private freqBuf: Uint8Array<ArrayBuffer>;
   private timeBuf: Uint8Array<ArrayBuffer>;
-  private prevEnergy = 0;
+
+  // Beat detection state
+  private energyHistory = new Float32Array(BEAT_HISTORY);
+  private energyIdx = 0;
+  private beat_ = 0;
+
+  // BPM estimation state
+  private beatTimes: number[] = [];
+  private bpm_ = 0;
 
   constructor(analyser: AnalyserNode) {
     this.analyser = analyser;
-    // frequencyBinCount = fftSize/2 = 512
     this.freqBuf = new Uint8Array(analyser.frequencyBinCount);
-    // We only need 512 of the 1024 time-domain samples
     this.timeBuf = new Uint8Array(analyser.frequencyBinCount);
   }
 
-  getData(): AudioData {
+  getData(timeSeconds: number): AudioData {
     this.analyser.getByteFrequencyData(this.freqBuf);
     this.analyser.getByteTimeDomainData(this.timeBuf);
 
@@ -49,11 +57,51 @@ export class Analyzer {
     const mid = bandEnergy(this.freqBuf, 6, 93);
     const treble = bandEnergy(this.freqBuf, 93, 370);
 
-    // Simple onset detection: spike in total energy vs smoothed average
-    const energy = (bass + mid + treble) / 3;
-    const delta = energy - this.prevEnergy;
-    const beat = Math.max(0, Math.min(1, delta * 6));
-    this.prevEnergy += (energy - this.prevEnergy) * 0.12;
+    // Beat detection: rolling average + threshold
+    const energy = (bass * 3 + mid + treble) / 5;
+    this.energyHistory[this.energyIdx % BEAT_HISTORY] = energy;
+    this.energyIdx++;
+
+    let avgEnergy = 0;
+    for (let i = 0; i < BEAT_HISTORY; i++) avgEnergy += this.energyHistory[i];
+    avgEnergy /= BEAT_HISTORY;
+
+    const threshold = avgEnergy * 1.4 + 0.005;
+    const isBeat = energy > threshold;
+
+    if (isBeat) {
+      this.beat_ = Math.min(1, Math.max(0, (energy - avgEnergy) / (avgEnergy + 0.001)));
+    } else {
+      this.beat_ = Math.max(0, this.beat_ - 0.08);
+    }
+
+    // BPM estimation from beat intervals
+    if (isBeat) {
+      const last = this.beatTimes.length > 0 ? this.beatTimes[this.beatTimes.length - 1] : 0;
+      if (timeSeconds - last > 0.2) {
+        this.beatTimes.push(timeSeconds);
+        while (this.beatTimes.length > 1 && timeSeconds - this.beatTimes[0] > 8) {
+          this.beatTimes.shift();
+        }
+      }
+    }
+
+    if (this.beatTimes.length >= 4) {
+      const span = this.beatTimes[this.beatTimes.length - 1] - this.beatTimes[0];
+      const avgInterval = span / (this.beatTimes.length - 1);
+      const bpm = avgInterval > 0 ? 60 / avgInterval : 0;
+      this.bpm_ = (bpm >= 60 && bpm <= 200) ? bpm : 0;
+    }
+
+    // Spectral centroid (normalized 0-1)
+    let weightedSum = 0;
+    let totalMag = 0;
+    const binCount = this.freqBuf.length;
+    for (let i = 0; i < binCount; i++) {
+      weightedSum += i * this.freqBuf[i];
+      totalMag += this.freqBuf[i];
+    }
+    const spectralCentroid = totalMag > 0 ? (weightedSum / totalMag) / binCount : 0;
 
     return {
       frequencyData: this.freqBuf,
@@ -61,9 +109,9 @@ export class Analyzer {
       bass,
       mid,
       treble,
-      beat,
-      spectralCentroid: 0,
-      bpm: 0,
+      beat: this.beat_,
+      spectralCentroid,
+      bpm: this.bpm_,
     };
   }
 }

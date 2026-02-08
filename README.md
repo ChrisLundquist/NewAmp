@@ -9,7 +9,7 @@ music come to life in real-time.
 - Drag-and-drop audio playback with full transport controls
 - Real-time WebGL2 visualizations driven by FFT, beat detection, and spectral analysis
 - Built-in Monaco (VS Code) shader editor with GLSL autocomplete and live error feedback
-- Rust/WASM DSP pipeline for high-quality audio analysis
+- Beat detection, BPM estimation, and spectral analysis — all in TypeScript
 - Preset system with save, load, import/export
 - Shadertoy-compatible uniform naming (`iTime`, `iResolution`, `iChannel0`, ...)
 - Feedback buffer support for trails and motion-blur effects

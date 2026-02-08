@@ -1,6 +1,5 @@
 import { AudioEngine } from './audio/engine';
 import { Analyzer, AudioData } from './audio/analyzer';
-import { WasmAnalyzer } from './audio/wasm-analyzer';
 import { Renderer } from './renderer/webgl';
 import { ShaderEditor } from './editor/editor';
 import { PresetManager } from './editor/preset-manager';
@@ -37,7 +36,7 @@ const renderScaleLabel  = document.getElementById('render-scale-value') as HTMLS
 
 /* ── Core objects ── */
 const audio          = new AudioEngine();
-const fallbackAnalyzer = new Analyzer(audio.analyser);
+const analyzer       = new Analyzer(audio.analyser);
 const renderer       = new Renderer(canvas);
 const presetManager  = new PresetManager();
 const shaderEditor   = new ShaderEditor(monacoContainer);
@@ -46,14 +45,6 @@ const inspector      = new UniformInspector(inspectorEl);
 /* ── State ── */
 let currentPresetKey = 'builtin:0';
 let editorOpen = false;
-let wasmAnalyzer: WasmAnalyzer | null = null;
-
-// Try to initialise WASM analyzer (async, falls back gracefully)
-WasmAnalyzer.create(audio.analyser).then((wa) => {
-  wasmAnalyzer = wa;
-  if (wa) console.log('WASM DSP pipeline active');
-  else console.log('Using AnalyserNode fallback');
-});
 
 /* ── Render scale ── */
 if (renderScaleSlider) {
@@ -455,7 +446,7 @@ function frame(now: number) {
 
   const timeSec = now / 1000;
   const audioData = audio.playing
-    ? (wasmAnalyzer?.getData(timeSec) ?? fallbackAnalyzer.getData())
+    ? analyzer.getData(timeSec)
     : silentData;
   renderer.render(timeSec, dt, audioData);
 

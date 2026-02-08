@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:wasm": "wasm-pack build crates/dsp --target web --out-dir ../../src/wasm/dsp",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"

@@ -25,17 +25,6 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install Rust + wasm-pack
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-      - name: Build WASM DSP module
-        run: wasm-pack build crates/dsp --target web --out-dir ../../src/wasm/dsp
-
       - name: Install dependencies
         run: npm ci
 
