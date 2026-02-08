@@ -22,7 +22,8 @@ uniform float     iTimeDelta;
 uniform vec2      iResolution;
 uniform sampler2D iChannel0;      // 512×2 audio texture (R8, LINEAR filtered)
                                   //   texture(iChannel0, vec2(x, 0.25)).r → FFT magnitude
-                                  //     x: 0.0=0Hz … 0.5≈11kHz … 1.0≈22kHz  (512 bins, ~43Hz each)
+                                  //     x: 0.0=0Hz … 0.5≈11kHz … 1.0≈22kHz  (512 linear bins, ~43Hz each)
+                                  //     TIP: use pow(x, 3.0) for log-frequency — most music is below 4kHz
                                   //   texture(iChannel0, vec2(x, 0.75)).r → PCM waveform
                                   //     x: 0.0=first sample … 1.0=last  (~11.6ms window at 44.1kHz)
                                   //     value 0.5=silence, >0.5=positive, <0.5=negative
@@ -49,7 +50,12 @@ export const presets: Preset[] = [
     fragmentShader: `
 void main() {
   vec2 uv = vUv;
-  float freq = texture(iChannel0, vec2(uv.x, 0.25)).r;
+
+  // Log-frequency mapping: spread bass/mid across more of the screen.
+  // Linear uv.x maps 0-22kHz evenly, but music lives below ~4kHz.
+  // pow(x, 3) gives ~75% of screen width to the first ~10% of bins.
+  float freqX = pow(uv.x, 3.0);
+  float freq = texture(iChannel0, vec2(freqX, 0.25)).r;
 
   // Soft bar
   float bar = smoothstep(uv.y + 0.01, uv.y - 0.01, freq);
@@ -99,9 +105,10 @@ void main() {
   float angle  = atan(uv.y, uv.x);
   float radius = length(uv);
 
-  // Map angle to 0-1 for texture lookup
+  // Map angle to 0-1, then apply log-frequency curve
   float a = (angle + 3.14159) / (2.0 * 3.14159);
-  float freq = texture(iChannel0, vec2(a, 0.25)).r;
+  float freqX = pow(a, 3.0);
+  float freq = texture(iChannel0, vec2(freqX, 0.25)).r;
 
   float inner = 0.25;
   float outer = inner + freq * 0.55;
@@ -207,7 +214,8 @@ void main() {
   float angle = atan(p.y, p.x);
   float r = length(p);
   float normA = (angle + 3.14159) / (2.0 * 3.14159);
-  float freq = texture(iChannel0, vec2(normA, 0.25)).r;
+  float freqX = pow(normA, 3.0);
+  float freq = texture(iChannel0, vec2(freqX, 0.25)).r;
 
   // Ring of frequency
   float ring = smoothstep(0.02, 0.0, abs(r - 0.3 - freq * 0.25)) * freq;
@@ -320,15 +328,24 @@ void main() {
 //   row 0 center = (0+0.5)/2 = 0.25
 //   row 1 center = (1+0.5)/2 = 0.75
 // Sampling at y=0.5 would blend both rows (useless).
+//
+// IMPORTANT: The FFT bins are linearly spaced (~43 Hz each), but
+// human hearing is logarithmic.  Most music lives below ~4 kHz
+// (bin ~93 out of 512).  Using uv.x directly means the right 80%
+// of the screen is nearly empty.  We use pow(x, 3.0) to give
+// more screen space to low/mid frequencies where the action is.
 
 void main() {
   vec2 uv = vUv;
 
-  // ── Top half: FFT frequency spectrum ──
-  // Sample the FFT row.  Value is 0.0 (silence) to 1.0 (loud).
-  float fft = texture(iChannel0, vec2(uv.x, 0.25)).r;
+  // ── Log-frequency mapping ──
+  // pow(x, 3.0) spreads bass/mid across most of the screen width.
+  float freqX = pow(uv.x, 3.0);
 
-  // ── Bottom half: PCM waveform ──
+  // ── Top half: FFT frequency spectrum ──
+  float fft = texture(iChannel0, vec2(freqX, 0.25)).r;
+
+  // ── Bottom half: PCM waveform (time-domain, linear x is correct) ──
   float wave = texture(iChannel0, vec2(uv.x, 0.75)).r;
 
   vec3 col = vec3(0.0);

@@ -139,6 +139,40 @@ presets.
 - [x] Full uniform inspector with type badges, live values, visual bars
 - [x] Code cleanup: vertex shader caching, first-frame fix, dead code removal
 
+### Phase 4b: Beat Detection & Audio Analysis Improvements
+**Goal:** Make beat detection more reliable and audio data more useful.
+
+The current beat detector uses a simple energy threshold with rolling average.
+It works for four-on-the-floor dance music but struggles with:
+- Tracks with gradual energy changes (false positives)
+- Complex rhythms where kicks overlap with other instruments
+- Quiet sections followed by sudden hits (threshold too low after silence)
+- BPM estimation drifting on syncopated rhythms
+
+**Potential improvements:**
+
+- [ ] Spectral flux onset detection (compare FFT frame-to-frame, not just energy)
+- [ ] Multi-band beat detection (separate onset detectors for bass/mid/treble)
+- [ ] Adaptive threshold with separate attack/release rates
+- [ ] Auto-correlation BPM (more robust than interval averaging)
+- [ ] Onset strength envelope with configurable sensitivity
+- [ ] Median-filtered BPM to reject outlier intervals
+- [ ] Separate `iBeatBass` / `iBeatSnare` / `iBeatHihat` uniforms for per-band onsets
+
+**FFT display quality:**
+
+The AnalyserNode provides 512 linearly-spaced bins (~43 Hz each at 44.1 kHz).
+This is a fundamental property of the DFT — not a bug — but it means:
+- Most musical content (20–4000 Hz) lives in the first ~93 bins (18% of texture)
+- High frequencies (4–22 kHz) get 82% of bins but carry little energy
+- MP3 encoding adds quantization noise in upper bins and cuts off at 16–18 kHz
+
+Presets now use `pow(x, 3.0)` log-frequency mapping to spread bass/mid across
+the full screen width. Future options:
+- [ ] Pre-compute log-frequency texture in the Analyzer (so all shaders benefit)
+- [ ] Mel-scale or Bark-scale binning for perceptually uniform frequency display
+- [ ] Smoothing/interpolation between frames to reduce FFT flicker
+
 ### Phase 5: Preset Compatibility
 **Goal:** Import shaders and presets from existing ecosystems.
 
