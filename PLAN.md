@@ -100,35 +100,38 @@ presets.
 
 ## Implementation Phases
 
-### Phase 1: Core Audio + Basic Rendering (MVP)
+### Phase 1: Core Audio + Basic Rendering (MVP) ✅
 **Goal:** Play a local audio file and render a shader that reacts to it.
 
-- [ ] Project scaffolding (Vite + TypeScript)
-- [ ] Audio engine: load local files, decode, play with transport controls
-- [ ] AnalyserNode-based FFT (good enough for MVP, no WASM yet)
-- [ ] WebGL2 renderer: fullscreen quad + fragment shader
-- [ ] Audio data → texture upload each frame
-- [ ] 3-5 built-in preset shaders (classic bars, waveform, radial, etc.)
-- [ ] Basic UI: file picker, play/pause, preset selector
+- [x] Project scaffolding (Vite + TypeScript)
+- [x] Audio engine: load local files, decode, play with transport controls
+- [x] AnalyserNode-based FFT (good enough for MVP, no WASM yet)
+- [x] WebGL2 renderer: fullscreen quad + fragment shader
+- [x] Audio data → texture upload each frame
+- [x] 5 built-in preset shaders (Spectrum Bars, Neon Waveform, Radial Spectrum, Audio Plasma, Tunnel Vortex)
+- [x] Basic UI: file picker, play/pause, seek, volume, preset selector, drag-and-drop
 
-### Phase 2: Shader Editor + Preset System
+### Phase 2: Shader Editor + Preset System ✅
 **Goal:** Users can write and save their own visualization shaders.
 
-- [ ] Embed Monaco editor with GLSL/WGSL syntax highlighting
-- [ ] Live shader compilation + hot-swap
-- [ ] Error reporting from shader compiler
-- [ ] Preset save/load (localStorage)
-- [ ] Preset export/import as JSON files
-- [ ] Uniform inspector panel
+- [x] Embed Monaco editor with GLSL syntax highlighting + uniform autocomplete
+- [x] Live shader compilation + hot-swap (300ms debounce)
+- [x] Error reporting from shader compiler (Monaco markers + error panel)
+- [x] Preset save/load (localStorage)
+- [x] Preset export/import as JSON files
+- [x] Uniform inspector panel (real-time iBass/iMid/iTreble/iBeat bars)
 
-### Phase 3: WASM Audio Pipeline
+### Phase 3: WASM Audio Pipeline ✅
 **Goal:** Replace AnalyserNode with high-quality Rust WASM FFT.
 
-- [ ] Rust crate for FFT analysis (`rustfft`, windowing, multi-resolution)
-- [ ] Compile to WASM, load in AudioWorklet
-- [ ] SharedArrayBuffer ring buffer for zero-copy data transfer
-- [ ] Beat detection algorithm
-- [ ] Enhanced audio uniforms (BPM, beat phase, spectral centroid, etc.)
+- [x] Rust crate (`newamp-dsp`) with `rustfft` for 1024-point Hanning-windowed FFT
+- [x] Compile to WASM via wasm-pack, load on main thread via `?url` import
+- [x] WasmAnalyzer reads float32 time-domain from AnalyserNode → WASM FFT
+- [x] Beat detection (energy-based onset with rolling average + debounce)
+- [x] BPM estimation from beat intervals
+- [x] Spectral centroid (sound brightness)
+- [x] New uniforms: `iSpectralCentroid`, `iBPM`
+- [x] Graceful fallback to AnalyserNode if WASM fails to load
 
 ### Phase 4: WebGPU + Advanced Rendering
 **Goal:** Unlock compute shaders and advanced visual effects.

@@ -1,5 +1,6 @@
 import { AudioEngine } from './audio/engine';
 import { Analyzer, AudioData } from './audio/analyzer';
+import { WasmAnalyzer } from './audio/wasm-analyzer';
 import { Renderer } from './renderer/webgl';
 import { presets } from './renderer/shaders';
 import { ShaderEditor } from './editor/editor';
@@ -34,7 +35,7 @@ const inspectorEl     = document.getElementById('uniform-inspector') as HTMLDivE
 
 /* ── Core objects ── */
 const audio          = new AudioEngine();
-const analyzer       = new Analyzer(audio.analyser);
+const fallbackAnalyzer = new Analyzer(audio.analyser);
 const renderer       = new Renderer(canvas);
 const presetManager  = new PresetManager();
 const shaderEditor   = new ShaderEditor(monacoContainer);
@@ -43,6 +44,14 @@ const inspector      = new UniformInspector(inspectorEl);
 /* ── State ── */
 let currentPresetKey = 'builtin:0';
 let editorOpen = false;
+let wasmAnalyzer: WasmAnalyzer | null = null;
+
+// Try to initialise WASM analyzer (async, falls back gracefully)
+WasmAnalyzer.create(audio.analyser).then((wa) => {
+  wasmAnalyzer = wa;
+  if (wa) console.log('WASM DSP pipeline active');
+  else console.log('Using AnalyserNode fallback');
+});
 
 /* ── Preset selector ── */
 function rebuildPresetSelect(selectKey?: string) {
@@ -363,6 +372,7 @@ const silentData: AudioData = {
   frequencyData: new Uint8Array(512),
   timeDomainData: new Uint8Array(512).fill(128),
   bass: 0, mid: 0, treble: 0, beat: 0,
+  spectralCentroid: 0, bpm: 0,
 };
 
 function frame(now: number) {
@@ -377,7 +387,10 @@ function frame(now: number) {
   const dt = (now - lastTime) / 1000;
   lastTime = now;
 
-  const audioData = audio.playing ? analyzer.getData() : silentData;
+  const timeSec = now / 1000;
+  const audioData = audio.playing
+    ? (wasmAnalyzer?.getData(timeSec) ?? fallbackAnalyzer.getData())
+    : silentData;
   renderer.render(now / 1000, dt, audioData);
 
   // Update time display (unless user is dragging the seek bar)

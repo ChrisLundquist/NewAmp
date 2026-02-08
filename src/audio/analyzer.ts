@@ -11,6 +11,10 @@ export interface AudioData {
   treble: number;
   /** Beat intensity — spikes on energy transients (0-1). */
   beat: number;
+  /** Spectral centroid, normalized 0-1 (brightness of sound). */
+  spectralCentroid: number;
+  /** Estimated BPM, 0 if unknown. */
+  bpm: number;
 }
 
 /**
@@ -58,6 +62,8 @@ export class Analyzer {
       mid,
       treble,
       beat,
+      spectralCentroid: 0,
+      bpm: 0,
     };
   }
 }

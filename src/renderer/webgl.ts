@@ -119,6 +119,7 @@ export class Renderer {
     for (const name of [
       'iTime', 'iTimeDelta', 'iResolution', 'iChannel0',
       'iBass', 'iMid', 'iTreble', 'iBeat',
+      'iSpectralCentroid', 'iBPM',
     ]) {
       this.loc[name] = gl.getUniformLocation(prog, name);
     }
@@ -159,6 +160,8 @@ export class Renderer {
     gl.uniform1f(this.loc['iMid'], audio.mid);
     gl.uniform1f(this.loc['iTreble'], audio.treble);
     gl.uniform1f(this.loc['iBeat'], audio.beat);
+    gl.uniform1f(this.loc['iSpectralCentroid'], audio.spectralCentroid);
+    gl.uniform1f(this.loc['iBPM'], audio.bpm);
 
     // Draw fullscreen quad
     gl.bindVertexArray(this.vao);

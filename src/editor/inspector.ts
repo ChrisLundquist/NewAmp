@@ -18,6 +18,7 @@ export class UniformInspector {
       { name: 'iMid', color: '#55b855' },
       { name: 'iTreble', color: '#5588ee' },
       { name: 'iBeat', color: '#ee88ff' },
+      { name: 'iSpectralCentroid', color: '#eebb55' },
     ];
 
     for (const u of uniforms) {
@@ -63,7 +64,8 @@ export class UniformInspector {
     this.setBar('iMid', audio.mid);
     this.setBar('iTreble', audio.treble);
     this.setBar('iBeat', audio.beat);
-    this.timeEl.textContent = time.toFixed(2) + 's';
+    this.setBar('iSpectralCentroid', audio.spectralCentroid);
+    this.timeEl.textContent = `${time.toFixed(2)}s` + (audio.bpm > 0 ? ` | ${Math.round(audio.bpm)} BPM` : '');
   }
 
   private setBar(name: string, value: number): void {

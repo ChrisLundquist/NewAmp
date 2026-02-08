@@ -25,6 +25,8 @@ uniform float     iBass;
 uniform float     iMid;
 uniform float     iTreble;
 uniform float     iBeat;
+uniform float     iSpectralCentroid;
+uniform float     iBPM;
 
 in  vec2 vUv;
 out vec4 fragColor;
