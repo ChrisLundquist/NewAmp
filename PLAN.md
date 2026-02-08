@@ -133,7 +133,7 @@ presets.
 - [x] New uniforms: `iSpectralCentroid`, `iBPM`
 - [x] Graceful fallback to AnalyserNode if WASM fails to load
 
-### Phase 4: Advanced Rendering + Editor (partial)
+### Phase 4: Advanced Rendering + Editor ✅
 **Goal:** Unlock advanced visual effects and a polished editor experience.
 
 - [x] Feedback buffers (iBackbuffer via FBO ping-pong)
@@ -143,21 +143,84 @@ presets.
 - [x] Clickable error panel navigates to error line in editor
 - [x] Monaco hover provider showing type, description, live value for uniforms
 - [x] Full uniform inspector with type badges, live values, visual bars
-- [ ] WebGPU renderer (with WebGL2 fallback path)
-- [ ] Multi-pass rendering pipeline
-- [ ] GPU compute shader for FFT (eliminate CPU→GPU transfer)
-- [ ] WGSL shader support in editor
+- [x] Code cleanup: vertex shader caching, first-frame fix, dead code removal
 
-### Phase 5: Community + Polish
+### Phase 5: Preset Compatibility
+**Goal:** Import shaders and presets from existing ecosystems.
+
+#### 5a. Shadertoy Import (easy — high value)
+Shadertoy shaders use the same GLSL but with a different entry point and
+slightly different uniforms. A thin adapter layer can make most Shadertoy
+audio-reactive shaders work in NewAmp.
+
+- [ ] Shadertoy adapter: wrap `mainImage(out vec4, in vec2)` → our `main()`
+- [ ] Compatibility defines: `vec3 iResolution` → our `vec2`, add `iMouse` stub
+- [ ] Import UI: paste Shadertoy shader code, auto-detect and wrap
+- [ ] Audio texture mapping note (Shadertoy uses `iChannel0` the same way)
+- [ ] Bundle 5–10 popular Shadertoy audio shaders as built-in presets
+
+Key differences to bridge:
+```
+Shadertoy                          NewAmp
+─────────────────────────────────  ──────────────────────────
+void mainImage(out vec4, in vec2)  void main()
+fragCoord (pixel coords)           vUv (0–1 normalized)
+iResolution (vec3)                 iResolution (vec2)
+iFrame (int)                       iFrame (float)
+iMouse (vec4)                      (not available)
+gl_FragCoord                       (available via vUv * iResolution)
+```
+
+#### 5b. MilkDrop Compatibility (medium-hard — massive preset library)
+
+MilkDrop .milk presets use a fundamentally different paradigm:
+- INI-like text format with key=value pairs
+- EEL2 expression language (not GLSL) for per-frame/per-pixel equations
+- Built-in motion pipeline: zoom, rot, warp, decay, per-vertex mesh grid
+- MilkDrop 2 added HLSL pixel shaders (warp shader + composite shader)
+- Q variables (q1–q32) bridge equation pools to shaders
+- Custom shapes and waves with their own equation code
+
+**Two tiers of support:**
+
+**Tier 1: MilkDrop 2 pixel shaders (HLSL→GLSL)**
+- [ ] Use butterchurn's HLSL→GLSL transpiler (MIT licensed, npm: `milkdrop-shader-converter`)
+- [ ] Map MilkDrop uniforms (q1–q32, _qa–_qh, time, bass/mid/treb) to NewAmp equivalents
+- [ ] Import UI for .milk files: extract warp/composite shaders, convert, load
+
+**Tier 2: Full .milk preset playback (via Butterchurn)**
+- [ ] Integrate [butterchurn](https://github.com/jberg/butterchurn) as an optional renderer
+- [ ] Use [milkdrop-preset-converter](https://github.com/jberg/milkdrop-preset-converter) to parse .milk → JSON
+- [ ] [milkdrop-eel-parser](https://github.com/jberg/milkdrop-eel-parser) handles EEL2→JS for equations
+- [ ] Render MilkDrop presets alongside native NewAmp shaders
+- [ ] Bundle curated set of classic .milk presets (cream of the crop from 10,000+)
+
+#### 5c. AVS (deprioritized)
+
+AVS uses a binary file format and a completely different rendering model
+(stacked effect tree, not shaders). An [AVS-File-Decoder](https://github.com/grandchild/AVS-File-Decoder)
+exists to parse .avs → JSON, but rendering them requires reimplementing
+the full AVS engine. Not worth building from scratch — link to existing
+tools instead.
+
+### Phase 6: Community + Polish
 **Goal:** Sharing, discovery, and a polished experience.
 
 - [ ] Preset gallery with thumbnails (generated via offscreen render)
 - [ ] Share presets via URL (shader code in URL hash or short links)
 - [ ] Playlist management (queue, shuffle, repeat)
-- [ ] Fullscreen mode with hidden UI
-- [ ] Keyboard shortcuts (space=pause, arrows=seek, F=fullscreen)
+- [ ] Fullscreen mode with auto-hiding UI
+- [x] Keyboard shortcuts (space=pause, arrows=seek, F=fullscreen, E=editor)
 - [ ] Mobile-responsive layout
 - [ ] Optional: backend for preset sharing/voting
+
+### Phase 7: WebGPU + Advanced Pipeline (future)
+**Goal:** Next-gen rendering for browsers that support WebGPU.
+
+- [ ] WebGPU renderer (with WebGL2 fallback path retained)
+- [ ] Multi-pass rendering pipeline (warp pass + composite pass)
+- [ ] GPU compute shader for FFT (eliminate CPU→GPU audio texture transfer)
+- [ ] WGSL shader support in editor (dual GLSL/WGSL)
 
 ## Key Design Decisions
 
