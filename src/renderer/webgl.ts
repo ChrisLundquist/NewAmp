@@ -11,6 +11,7 @@ import type { AudioData } from '../audio/analyzer';
 export class Renderer {
   private gl: WebGL2RenderingContext;
   private program: WebGLProgram | null = null;
+  private cachedVS: WebGLShader | null = null;
   private vao: WebGLVertexArrayObject;
   private audioTex: WebGLTexture;
   private texBuf: Uint8Array;
@@ -139,11 +140,17 @@ export class Renderer {
 
   /* ── Shader Compilation ── */
 
+  private getVertexShader(): WebGLShader | null {
+    if (this.cachedVS) return this.cachedVS;
+    this.cachedVS = this.compile(this.gl.VERTEX_SHADER, VERTEX_SHADER);
+    return this.cachedVS;
+  }
+
   setShader(fragmentBody: string): { success: boolean; error?: string } {
     const gl = this.gl;
     const fragSrc = FRAGMENT_HEADER + fragmentBody;
 
-    const vs = this.compile(gl.VERTEX_SHADER, VERTEX_SHADER);
+    const vs = this.getVertexShader();
     if (!vs) {
       return { success: false, error: 'Vertex shader compilation failed' };
     }
@@ -154,7 +161,6 @@ export class Renderer {
 
     if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
       const raw = gl.getShaderInfoLog(fs) ?? '';
-      gl.deleteShader(vs);
       gl.deleteShader(fs);
       return { success: false, error: raw };
     }
@@ -167,14 +173,12 @@ export class Renderer {
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
       const err = gl.getProgramInfoLog(prog) ?? 'link error';
       gl.deleteProgram(prog);
-      gl.deleteShader(vs);
       gl.deleteShader(fs);
       return { success: false, error: err };
     }
 
     if (this.program) gl.deleteProgram(this.program);
     this.program = prog;
-    gl.deleteShader(vs);
     gl.deleteShader(fs);
 
     // Cache uniform locations
@@ -205,7 +209,7 @@ export class Renderer {
 
   /* ── Render ── */
 
-  private frameCount = 0;
+  frameCount = 0;
 
   render(time: number, timeDelta: number, audio: AudioData): void {
     const gl = this.gl;
@@ -273,9 +277,5 @@ export class Renderer {
     // 3) Swap
     this.pingPong = !this.pingPong;
     this.frameCount++;
-  }
-
-  resize(): void {
-    // FBOs will be recreated on next render() when size mismatch is detected
   }
 }

@@ -133,15 +133,20 @@ presets.
 - [x] New uniforms: `iSpectralCentroid`, `iBPM`
 - [x] Graceful fallback to AnalyserNode if WASM fails to load
 
-### Phase 4: WebGPU + Advanced Rendering
-**Goal:** Unlock compute shaders and advanced visual effects.
+### Phase 4: Advanced Rendering + Editor (partial)
+**Goal:** Unlock advanced visual effects and a polished editor experience.
 
+- [x] Feedback buffers (iBackbuffer via FBO ping-pong)
+- [x] Resolution scaling for performance (25%–100%)
+- [x] 3 new feedback presets (Feedback Trails, Warp Feedback, Kaleidoscope)
+- [x] Shader error parsing with line mapping (Chrome + Firefox formats)
+- [x] Clickable error panel navigates to error line in editor
+- [x] Monaco hover provider showing type, description, live value for uniforms
+- [x] Full uniform inspector with type badges, live values, visual bars
 - [ ] WebGPU renderer (with WebGL2 fallback path)
-- [ ] Feedback buffers (previous frame as texture input)
 - [ ] Multi-pass rendering pipeline
 - [ ] GPU compute shader for FFT (eliminate CPU→GPU transfer)
 - [ ] WGSL shader support in editor
-- [ ] Resolution scaling for performance
 
 ### Phase 5: Community + Polish
 **Goal:** Sharing, discovery, and a polished experience.

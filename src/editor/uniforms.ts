@@ -47,7 +47,11 @@ export const UNIFORM_CATALOG: UniformInfo[] = [
       '  Row 1 (sample at y≈0.75): Raw PCM waveform, 512 samples.\n' +
       'Values are in the 0.0–1.0 range. Sample with texture(iChannel0, vec2(x, 0.25)).r',
     liveValue: (ctx) => {
-      const peak = Math.max(...Array.from(ctx.audio.frequencyData.slice(0, 32)));
+      let peak = 0;
+      const fd = ctx.audio.frequencyData;
+      for (let i = 0; i < 32 && i < fd.length; i++) {
+        if (fd[i] > peak) peak = fd[i];
+      }
       return `peak low-freq bin: ${peak}/255`;
     },
   },

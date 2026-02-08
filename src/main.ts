@@ -2,8 +2,7 @@ import { AudioEngine } from './audio/engine';
 import { Analyzer, AudioData } from './audio/analyzer';
 import { WasmAnalyzer } from './audio/wasm-analyzer';
 import { Renderer } from './renderer/webgl';
-import { presets } from './renderer/shaders';
-import { ShaderEditor, type ParsedError } from './editor/editor';
+import { ShaderEditor } from './editor/editor';
 import { PresetManager } from './editor/preset-manager';
 import { UniformInspector } from './editor/inspector';
 import type { LiveContext } from './editor/uniforms';
@@ -397,7 +396,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ── Animation loop ── */
-let lastTime = 0;
+let lastTime = -1;
 
 const silentData: AudioData = {
   frequencyData: new Uint8Array(512),
@@ -406,9 +405,10 @@ const silentData: AudioData = {
   spectralCentroid: 0, bpm: 0,
 };
 
-let frameCount = 0;
-
 function frame(now: number) {
+  // Avoid huge dt spike on first frame
+  if (lastTime < 0) lastTime = now;
+
   const dpr = window.devicePixelRatio || 1;
   const w = Math.round(canvas.clientWidth * dpr);
   const h = Math.round(canvas.clientHeight * dpr);
@@ -443,14 +443,13 @@ function frame(now: number) {
         Math.round(w * renderScale),
         Math.round(h * renderScale),
       ],
-      frame: frameCount,
+      frame: renderer.frameCount,
     };
 
     shaderEditor.liveContext = ctx;
     inspector.update(ctx);
   }
 
-  frameCount++;
   requestAnimationFrame(frame);
 }
 
