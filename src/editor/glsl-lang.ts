@@ -129,6 +129,8 @@ export function registerGLSL() {
         { label: 'iBeat', kind: monaco.languages.CompletionItemKind.Variable, insertText: 'iBeat', detail: 'float — beat intensity 0-1', range },
         { label: 'iSpectralCentroid', kind: monaco.languages.CompletionItemKind.Variable, insertText: 'iSpectralCentroid', detail: 'float — spectral centroid 0-1 (brightness)', range },
         { label: 'iBPM', kind: monaco.languages.CompletionItemKind.Variable, insertText: 'iBPM', detail: 'float — estimated BPM (0 if unknown)', range },
+        { label: 'iBackbuffer', kind: monaco.languages.CompletionItemKind.Variable, insertText: 'iBackbuffer', detail: 'sampler2D — previous frame (feedback)', range },
+        { label: 'iFrame', kind: monaco.languages.CompletionItemKind.Variable, insertText: 'iFrame', detail: 'float — frame counter', range },
         { label: 'vUv', kind: monaco.languages.CompletionItemKind.Variable, insertText: 'vUv', detail: 'vec2 — UV coordinates 0-1', range },
         { label: 'fragColor', kind: monaco.languages.CompletionItemKind.Variable, insertText: 'fragColor', detail: 'vec4 — output color', range },
       ];

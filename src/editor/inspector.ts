@@ -1,78 +1,99 @@
-import type { AudioData } from '../audio/analyzer';
+import { UNIFORM_CATALOG, type LiveContext } from './uniforms';
 
 /**
- * Real-time display of shader uniform values.
- * Rendered as labeled horizontal bars inside a container div.
+ * Uniform inspector panel.
+ *
+ * Shows every shader uniform with:
+ *   • type badge (float, vec2, sampler2D, …)
+ *   • name
+ *   • live value (updated every frame)
+ *   • visual bar for 0-1 ranged floats
  */
 export class UniformInspector {
   private container: HTMLElement;
-  private bars: Map<string, { bar: HTMLElement; value: HTMLElement }> = new Map();
-  private timeEl: HTMLElement;
+  private rows: Map<string, {
+    valueEl: HTMLElement;
+    barEl?: HTMLElement;
+  }> = new Map();
 
   constructor(container: HTMLElement) {
     this.container = container;
     this.container.innerHTML = '';
 
-    const uniforms = [
-      { name: 'iBass', color: '#e05555' },
-      { name: 'iMid', color: '#55b855' },
-      { name: 'iTreble', color: '#5588ee' },
-      { name: 'iBeat', color: '#ee88ff' },
-      { name: 'iSpectralCentroid', color: '#eebb55' },
-    ];
+    // Section header
+    const header = document.createElement('div');
+    header.className = 'inspector-header';
+    header.textContent = 'Uniforms';
+    this.container.appendChild(header);
 
-    for (const u of uniforms) {
+    const barUniforms = new Set(['iBass', 'iMid', 'iTreble', 'iBeat', 'iSpectralCentroid']);
+    const barColors: Record<string, string> = {
+      iBass: '#e05555',
+      iMid: '#55b855',
+      iTreble: '#5588ee',
+      iBeat: '#ee88ff',
+      iSpectralCentroid: '#eebb55',
+    };
+
+    for (const u of UNIFORM_CATALOG) {
       const row = document.createElement('div');
       row.className = 'inspector-row';
 
-      const label = document.createElement('span');
-      label.className = 'inspector-label';
-      label.textContent = u.name;
+      // Type badge
+      const typeBadge = document.createElement('span');
+      typeBadge.className = 'inspector-type';
+      typeBadge.textContent = u.type;
 
-      const track = document.createElement('div');
-      track.className = 'inspector-track';
+      // Name
+      const nameEl = document.createElement('span');
+      nameEl.className = 'inspector-name';
+      nameEl.textContent = u.name;
+      nameEl.title = u.description + (u.range ? `\nRange: ${u.range}` : '');
 
-      const bar = document.createElement('div');
-      bar.className = 'inspector-bar';
-      bar.style.background = u.color;
-      track.appendChild(bar);
+      // Value display
+      const valueEl = document.createElement('span');
+      valueEl.className = 'inspector-value';
+      valueEl.textContent = '—';
 
-      const val = document.createElement('span');
-      val.className = 'inspector-value';
-      val.textContent = '0.00';
+      row.append(typeBadge, nameEl);
 
-      row.append(label, track, val);
+      let barEl: HTMLElement | undefined;
+      if (barUniforms.has(u.name)) {
+        const track = document.createElement('div');
+        track.className = 'inspector-track';
+        barEl = document.createElement('div');
+        barEl.className = 'inspector-bar';
+        barEl.style.background = barColors[u.name] ?? '#888';
+        track.appendChild(barEl);
+        row.appendChild(track);
+      } else {
+        // Spacer so value aligns right
+        const spacer = document.createElement('div');
+        spacer.className = 'inspector-spacer';
+        row.appendChild(spacer);
+      }
+
+      row.appendChild(valueEl);
       this.container.appendChild(row);
-      this.bars.set(u.name, { bar, value: val });
+      this.rows.set(u.name, { valueEl, barEl });
     }
-
-    // iTime row (text only, no bar)
-    const timeRow = document.createElement('div');
-    timeRow.className = 'inspector-row';
-    const timeLabel = document.createElement('span');
-    timeLabel.className = 'inspector-label';
-    timeLabel.textContent = 'iTime';
-    this.timeEl = document.createElement('span');
-    this.timeEl.className = 'inspector-value inspector-time';
-    this.timeEl.textContent = '0.00s';
-    timeRow.append(timeLabel, this.timeEl);
-    this.container.appendChild(timeRow);
   }
 
-  update(audio: AudioData, time: number): void {
-    this.setBar('iBass', audio.bass);
-    this.setBar('iMid', audio.mid);
-    this.setBar('iTreble', audio.treble);
-    this.setBar('iBeat', audio.beat);
-    this.setBar('iSpectralCentroid', audio.spectralCentroid);
-    this.timeEl.textContent = `${time.toFixed(2)}s` + (audio.bpm > 0 ? ` | ${Math.round(audio.bpm)} BPM` : '');
-  }
+  update(ctx: LiveContext): void {
+    for (const u of UNIFORM_CATALOG) {
+      const entry = this.rows.get(u.name);
+      if (!entry) continue;
 
-  private setBar(name: string, value: number): void {
-    const entry = this.bars.get(name);
-    if (!entry) return;
-    const clamped = Math.max(0, Math.min(1, value));
-    entry.bar.style.width = (clamped * 100) + '%';
-    entry.value.textContent = clamped.toFixed(2);
+      const val = u.liveValue(ctx);
+      entry.valueEl.textContent = val;
+
+      // Update bar for 0-1 ranged values
+      if (entry.barEl) {
+        const numVal = parseFloat(val);
+        if (!isNaN(numVal)) {
+          entry.barEl.style.width = (Math.max(0, Math.min(1, numVal)) * 100) + '%';
+        }
+      }
+    }
   }
 }

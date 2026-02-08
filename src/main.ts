@@ -3,9 +3,10 @@ import { Analyzer, AudioData } from './audio/analyzer';
 import { WasmAnalyzer } from './audio/wasm-analyzer';
 import { Renderer } from './renderer/webgl';
 import { presets } from './renderer/shaders';
-import { ShaderEditor } from './editor/editor';
+import { ShaderEditor, type ParsedError } from './editor/editor';
 import { PresetManager } from './editor/preset-manager';
 import { UniformInspector } from './editor/inspector';
+import type { LiveContext } from './editor/uniforms';
 
 /* ── DOM refs ── */
 const canvas          = document.getElementById('viz-canvas')      as HTMLCanvasElement;
@@ -32,6 +33,8 @@ const importPresetIn  = document.getElementById('import-preset')   as HTMLInputE
 const shaderErrorsEl  = document.getElementById('shader-errors')   as HTMLDivElement;
 const monacoContainer = document.getElementById('monaco-container') as HTMLDivElement;
 const inspectorEl     = document.getElementById('uniform-inspector') as HTMLDivElement;
+const renderScaleSlider = document.getElementById('render-scale')  as HTMLInputElement | null;
+const renderScaleLabel  = document.getElementById('render-scale-value') as HTMLSpanElement | null;
 
 /* ── Core objects ── */
 const audio          = new AudioEngine();
@@ -52,6 +55,15 @@ WasmAnalyzer.create(audio.analyser).then((wa) => {
   if (wa) console.log('WASM DSP pipeline active');
   else console.log('Using AnalyserNode fallback');
 });
+
+/* ── Render scale ── */
+if (renderScaleSlider) {
+  renderScaleSlider.addEventListener('input', () => {
+    const v = Number(renderScaleSlider.value) / 100;
+    renderer.renderScale = v;
+    if (renderScaleLabel) renderScaleLabel.textContent = Math.round(v * 100) + '%';
+  });
+}
 
 /* ── Preset selector ── */
 function rebuildPresetSelect(selectKey?: string) {
@@ -107,6 +119,7 @@ function applyPresetByKey(key: string) {
     showShaderErrors(result.error ?? '');
   } else {
     clearShaderErrors();
+    shaderEditor.clearErrors();
   }
 }
 
@@ -145,16 +158,34 @@ shaderEditor.onChange = (code: string) => {
     shaderEditor.clearErrors();
   } else {
     showShaderErrors(result.error ?? '');
-    shaderEditor.setErrors((result.error ?? '').split('\n').filter(Boolean));
   }
 };
 
-function showShaderErrors(error: string) {
+function showShaderErrors(rawLog: string) {
+  const parsed = shaderEditor.setErrors(rawLog);
   shaderErrorsEl.innerHTML = '';
-  for (const line of error.split('\n').filter(Boolean)) {
+
+  for (const err of parsed) {
     const div = document.createElement('div');
     div.className = 'error-line';
-    div.textContent = line;
+    div.dataset.line = String(err.line);
+
+    const lineSpan = document.createElement('span');
+    lineSpan.className = 'error-line-num';
+    lineSpan.textContent = `L${err.line}`;
+
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'error-msg';
+    msgSpan.textContent = err.message;
+
+    if (err.severity === 'warning') {
+      div.classList.add('warning');
+    }
+
+    div.append(lineSpan, msgSpan);
+    div.addEventListener('click', () => {
+      shaderEditor.goToLine(err.line);
+    });
     shaderErrorsEl.appendChild(div);
   }
 }
@@ -375,6 +406,8 @@ const silentData: AudioData = {
   spectralCentroid: 0, bpm: 0,
 };
 
+let frameCount = 0;
+
 function frame(now: number) {
   const dpr = window.devicePixelRatio || 1;
   const w = Math.round(canvas.clientWidth * dpr);
@@ -391,7 +424,7 @@ function frame(now: number) {
   const audioData = audio.playing
     ? (wasmAnalyzer?.getData(timeSec) ?? fallbackAnalyzer.getData())
     : silentData;
-  renderer.render(now / 1000, dt, audioData);
+  renderer.render(timeSec, dt, audioData);
 
   // Update time display (unless user is dragging the seek bar)
   if (!seeking && audio.duration > 0) {
@@ -399,11 +432,25 @@ function frame(now: number) {
     seekBar.value = String((audio.currentTime / audio.duration) * 1000);
   }
 
-  // Update uniform inspector when editor is open
+  // Feed live context to editor and inspector when editor is open
   if (editorOpen) {
-    inspector.update(audioData, now / 1000);
+    const renderScale = renderer.renderScale;
+    const ctx: LiveContext = {
+      audio: audioData,
+      time: timeSec,
+      timeDelta: dt,
+      resolution: [
+        Math.round(w * renderScale),
+        Math.round(h * renderScale),
+      ],
+      frame: frameCount,
+    };
+
+    shaderEditor.liveContext = ctx;
+    inspector.update(ctx);
   }
 
+  frameCount++;
   requestAnimationFrame(frame);
 }
 

@@ -2,15 +2,30 @@ import { VERTEX_SHADER, FRAGMENT_HEADER } from './shaders';
 import type { AudioData } from '../audio/analyzer';
 
 /**
- * WebGL2 renderer that draws a fullscreen quad with a user-supplied
- * fragment shader, fed by an audio data texture and uniforms.
+ * WebGL2 renderer with:
+ *   - Fullscreen-quad fragment shader pipeline
+ *   - Audio data texture (512×2, FFT + waveform)
+ *   - Feedback buffer (iBackbuffer) via FBO ping-pong
+ *   - Resolution scaling for performance
  */
 export class Renderer {
   private gl: WebGL2RenderingContext;
   private program: WebGLProgram | null = null;
   private vao: WebGLVertexArrayObject;
   private audioTex: WebGLTexture;
-  private texBuf: Uint8Array; // 512 * 2 bytes packed for texture upload
+  private texBuf: Uint8Array;
+
+  // Feedback ping-pong FBOs
+  private fboA!: WebGLFramebuffer;
+  private fboB!: WebGLFramebuffer;
+  private texA!: WebGLTexture;
+  private texB!: WebGLTexture;
+  private fboW = 0;
+  private fboH = 0;
+  private pingPong = false; // false → write A, read B; true → write B, read A
+
+  // Resolution scale (0.25 – 1.0)
+  private _renderScale = 1.0;
 
   // Uniform locations (refreshed on each setShader)
   private loc: Record<string, WebGLUniformLocation | null> = {};
@@ -23,6 +38,18 @@ export class Renderer {
     this.vao = this.initQuad();
     this.audioTex = this.initAudioTexture();
     this.texBuf = new Uint8Array(512 * 2);
+    this.initFBOs(1, 1); // will be resized on first render
+  }
+
+  get renderScale(): number {
+    return this._renderScale;
+  }
+
+  set renderScale(v: number) {
+    this._renderScale = Math.max(0.25, Math.min(1.0, v));
+    // Force FBO recreate on next render
+    this.fboW = 0;
+    this.fboH = 0;
   }
 
   /* ── Geometry ── */
@@ -34,7 +61,6 @@ export class Renderer {
 
     const vbo = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    // Triangle-strip fullscreen quad: 4 verts
     gl.bufferData(
       gl.ARRAY_BUFFER,
       new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
@@ -53,13 +79,7 @@ export class Renderer {
     const gl = this.gl;
     const tex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    // 512 wide × 2 tall, single-channel R8
-    gl.texImage2D(
-      gl.TEXTURE_2D, 0, gl.R8,
-      512, 2, 0,
-      gl.RED, gl.UNSIGNED_BYTE,
-      new Uint8Array(512 * 2),
-    );
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 512, 2, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array(512 * 2));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -74,12 +94,47 @@ export class Renderer {
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.audioTex);
-    gl.texSubImage2D(
-      gl.TEXTURE_2D, 0,
-      0, 0, 512, 2,
-      gl.RED, gl.UNSIGNED_BYTE,
-      this.texBuf,
-    );
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 512, 2, gl.RED, gl.UNSIGNED_BYTE, this.texBuf);
+  }
+
+  /* ── Feedback FBOs ── */
+
+  private initFBOs(w: number, h: number): void {
+    const gl = this.gl;
+
+    // Clean up old FBOs
+    if (this.fboA) gl.deleteFramebuffer(this.fboA);
+    if (this.fboB) gl.deleteFramebuffer(this.fboB);
+    if (this.texA) gl.deleteTexture(this.texA);
+    if (this.texB) gl.deleteTexture(this.texB);
+
+    this.texA = this.createFboTexture(w, h);
+    this.texB = this.createFboTexture(w, h);
+    this.fboA = this.createFbo(this.texA);
+    this.fboB = this.createFbo(this.texB);
+    this.fboW = w;
+    this.fboH = h;
+  }
+
+  private createFboTexture(w: number, h: number): WebGLTexture {
+    const gl = this.gl;
+    const tex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return tex;
+  }
+
+  private createFbo(tex: WebGLTexture): WebGLFramebuffer {
+    const gl = this.gl;
+    const fbo = gl.createFramebuffer()!;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return fbo;
   }
 
   /* ── Shader Compilation ── */
@@ -89,10 +144,19 @@ export class Renderer {
     const fragSrc = FRAGMENT_HEADER + fragmentBody;
 
     const vs = this.compile(gl.VERTEX_SHADER, VERTEX_SHADER);
-    const fs = this.compile(gl.FRAGMENT_SHADER, fragSrc);
-    if (!vs || !fs) {
-      const err = !vs ? 'vertex shader error' : gl.getShaderInfoLog(fs!) ?? 'fragment shader error';
-      return { success: false, error: err };
+    if (!vs) {
+      return { success: false, error: 'Vertex shader compilation failed' };
+    }
+
+    const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
+    gl.shaderSource(fs, fragSrc);
+    gl.compileShader(fs);
+
+    if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+      const raw = gl.getShaderInfoLog(fs) ?? '';
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      return { success: false, error: raw };
     }
 
     const prog = gl.createProgram()!;
@@ -108,7 +172,6 @@ export class Renderer {
       return { success: false, error: err };
     }
 
-    // Swap programs
     if (this.program) gl.deleteProgram(this.program);
     this.program = prog;
     gl.deleteShader(vs);
@@ -120,6 +183,7 @@ export class Renderer {
       'iTime', 'iTimeDelta', 'iResolution', 'iChannel0',
       'iBass', 'iMid', 'iTreble', 'iBeat',
       'iSpectralCentroid', 'iBPM',
+      'iBackbuffer', 'iFrame',
     ]) {
       this.loc[name] = gl.getUniformLocation(prog, name);
     }
@@ -133,7 +197,6 @@ export class Renderer {
     gl.shaderSource(s, src);
     gl.compileShader(s);
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      console.error(gl.getShaderInfoLog(s));
       gl.deleteShader(s);
       return null;
     }
@@ -142,33 +205,77 @@ export class Renderer {
 
   /* ── Render ── */
 
+  private frameCount = 0;
+
   render(time: number, timeDelta: number, audio: AudioData): void {
     const gl = this.gl;
     if (!this.program) return;
 
+    // Determine render resolution (scaled)
+    const canvasW = gl.drawingBufferWidth;
+    const canvasH = gl.drawingBufferHeight;
+    const renderW = Math.max(1, Math.round(canvasW * this._renderScale));
+    const renderH = Math.max(1, Math.round(canvasH * this._renderScale));
+
+    // Resize FBOs if needed
+    if (renderW !== this.fboW || renderH !== this.fboH) {
+      this.initFBOs(renderW, renderH);
+    }
+
     this.uploadAudioData(audio);
 
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    // Determine read/write FBOs
+    const writeFbo = this.pingPong ? this.fboB : this.fboA;
+    const readTex = this.pingPong ? this.texA : this.texB;
+
+    // 1) Render shader to write FBO
+    gl.bindFramebuffer(gl.FRAMEBUFFER, writeFbo);
+    gl.viewport(0, 0, renderW, renderH);
     gl.useProgram(this.program);
 
-    // Uniforms
+    // Audio texture → unit 0
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.audioTex);
+    gl.uniform1i(this.loc['iChannel0'], 0);
+
+    // Backbuffer (previous frame) → unit 1
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, readTex);
+    gl.uniform1i(this.loc['iBackbuffer'], 1);
+
+    // Scalar uniforms
     gl.uniform1f(this.loc['iTime'], time);
     gl.uniform1f(this.loc['iTimeDelta'], timeDelta);
-    gl.uniform2f(this.loc['iResolution'], gl.drawingBufferWidth, gl.drawingBufferHeight);
-    gl.uniform1i(this.loc['iChannel0'], 0); // texture unit 0
+    gl.uniform2f(this.loc['iResolution'], renderW, renderH);
     gl.uniform1f(this.loc['iBass'], audio.bass);
     gl.uniform1f(this.loc['iMid'], audio.mid);
     gl.uniform1f(this.loc['iTreble'], audio.treble);
     gl.uniform1f(this.loc['iBeat'], audio.beat);
     gl.uniform1f(this.loc['iSpectralCentroid'], audio.spectralCentroid);
     gl.uniform1f(this.loc['iBPM'], audio.bpm);
+    gl.uniform1f(this.loc['iFrame'], this.frameCount);
 
-    // Draw fullscreen quad
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    // 2) Blit from write FBO to canvas (default framebuffer)
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, writeFbo);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    gl.blitFramebuffer(
+      0, 0, renderW, renderH,
+      0, 0, canvasW, canvasH,
+      gl.COLOR_BUFFER_BIT,
+      this._renderScale < 1.0 ? gl.LINEAR : gl.NEAREST,
+    );
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    // 3) Swap
+    this.pingPong = !this.pingPong;
+    this.frameCount++;
   }
 
   resize(): void {
-    // Viewport is set each frame in render(), nothing else needed
+    // FBOs will be recreated on next render() when size mismatch is detected
   }
 }

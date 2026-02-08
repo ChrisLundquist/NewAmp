@@ -29,6 +29,11 @@
         <input type="range" id="volume" min="0" max="100" value="80" />
       </div>
       <select id="preset-select"></select>
+      <div class="render-scale-group" title="Render resolution scale">
+        <span class="render-scale-icon">Res</span>
+        <input type="range" id="render-scale" min="25" max="100" value="100" step="5" />
+        <span id="render-scale-value" class="render-scale-label">100%</span>
+      </div>
       <button id="editor-toggle" class="transport-btn" title="Shader Editor">{ }</button>
       <button id="fullscreen-btn" class="transport-btn" title="Fullscreen">&#x26F6;</button>
     </div>
