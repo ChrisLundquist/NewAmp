@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NewAmp</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <canvas id="viz-canvas"></canvas>
+
+  <div id="drop-overlay" class="hidden">
+    <div class="drop-message">Drop audio file here</div>
+  </div>
+
+  <div id="controls">
+    <div class="controls-row">
+      <label class="file-btn">
+        <input type="file" id="file-input" accept="audio/*" />
+        Open
+      </label>
+      <button id="play-btn" class="transport-btn" title="Play/Pause" disabled>&#9654;</button>
+      <button id="stop-btn" class="transport-btn" title="Stop" disabled>&#9632;</button>
+      <span id="time-current" class="time">0:00</span>
+      <input type="range" id="seek-bar" min="0" max="1000" value="0" step="1" />
+      <span id="time-total" class="time">0:00</span>
+      <div class="volume-group">
+        <span class="volume-icon">&#128264;</span>
+        <input type="range" id="volume" min="0" max="100" value="80" />
+      </div>
+      <select id="preset-select"></select>
+      <button id="fullscreen-btn" class="transport-btn" title="Fullscreen">&#x26F6;</button>
+    </div>
+    <div id="track-name" class="track-name">No file loaded</div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
