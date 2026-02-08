@@ -268,6 +268,32 @@ body.editor-open #controls {
   pointer-events: none;
 }
 
+/* ── Resize Handle ── */
+#editor-resize-handle {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 70;
+}
+
+#editor-resize-handle:hover,
+#editor-resize-handle.dragging {
+  background: rgba(0, 120, 215, 0.5);
+}
+
+body.editor-resizing {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+body.editor-resizing #viz-canvas,
+body.editor-resizing #editor-panel {
+  transition: none;
+}
+
 /* ── Editor Toolbar ── */
 #editor-toolbar {
   display: flex;

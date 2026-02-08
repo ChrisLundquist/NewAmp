@@ -149,6 +149,39 @@ function toggleEditor(open?: boolean) {
 editorToggleBtn.addEventListener('click', () => toggleEditor());
 editorCloseBtn.addEventListener('click', () => toggleEditor(false));
 
+/* ── Editor resize handle ── */
+const resizeHandle = document.getElementById('editor-resize-handle');
+if (resizeHandle) {
+  const MIN_WIDTH = 280;
+  const MAX_RATIO = 0.8;
+
+  resizeHandle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    resizeHandle.classList.add('dragging');
+    document.body.classList.add('editor-resizing');
+    resizeHandle.setPointerCapture(e.pointerId);
+
+    const onMove = (ev: PointerEvent) => {
+      const w = Math.max(MIN_WIDTH, Math.min(
+        window.innerWidth * MAX_RATIO,
+        window.innerWidth - ev.clientX,
+      ));
+      document.documentElement.style.setProperty('--editor-width', w + 'px');
+      shaderEditor.layout();
+    };
+
+    const onUp = () => {
+      resizeHandle.classList.remove('dragging');
+      document.body.classList.remove('editor-resizing');
+      resizeHandle.removeEventListener('pointermove', onMove);
+      resizeHandle.removeEventListener('pointerup', onUp);
+    };
+
+    resizeHandle.addEventListener('pointermove', onMove);
+    resizeHandle.addEventListener('pointerup', onUp);
+  });
+}
+
 /* ── Live shader compilation ── */
 shaderEditor.onChange = (code: string) => {
   const result = renderer.setShader(code);
