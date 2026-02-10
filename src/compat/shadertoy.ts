@@ -10,8 +10,16 @@
  *   iResolution (vec3)                 iResolution (vec2)
  *   iFrame (int)                       iFrame (float)
  *   iMouse (vec4)                      (not available — stubbed)
+ *   iChannel0–3 (sampler2D)            iChannel0 + iBackbuffer
  *   gl_FragCoord                       (available via vUv * iResolution)
  *   fragColor = ...                    fragColor = ... (same output)
+ *
+ * Multi-pass support: ShaderToy shaders may have multiple buffers
+ * (Buffer A, B, C, D + Image).  When pasted together they contain
+ * multiple mainImage() definitions.  We detect this and either:
+ *   - Use only the last mainImage (the Image pass), renaming earlier
+ *     ones so they still compile as helper functions.
+ *   - Or merge them into a single-pass approximation.
  *
  * The adapter prepends a compatibility preamble that re-declares the
  * differing uniforms and defines a main() that calls mainImage().
@@ -49,9 +57,24 @@ export const SHADERTOY_PREAMBLE = `
 // Stub iMouse (ShaderToy provides click/drag coords; we have none).
 const vec4 iMouse = vec4(0.0);
 
-// ShaderToy's iChannelResolution for channel 0 (our 512×2 audio texture).
-const vec3 iChannelResolution_0 = vec3(512.0, 2.0, 1.0);
-#define iChannelResolution vec3[1](iChannelResolution_0)
+// ShaderToy channels 1–3: not available in NewAmp, stub to existing textures.
+// iChannel0 = audio texture (512x2 R8, provided by NewAmp FRAGMENT_HEADER).
+// iChannel1 = backbuffer (previous frame — useful fallback for feedback/image shaders).
+// iChannel2/3 = audio texture again (returns valid data for texture/texelFetch).
+#define iChannel1 iBackbuffer
+#define iChannel2 iChannel0
+#define iChannel3 iChannel0
+
+// ShaderToy's iChannelResolution — array of vec3 for all 4 channels.
+// channel 0: 512×2 audio texture
+// channel 1: backbuffer (approximate with viewport resolution)
+// channel 2/3: same as channel 0
+vec3 iChannelResolution[4] = vec3[4](
+  vec3(512.0, 2.0, 1.0),
+  vec3(iResolution, 1.0),
+  vec3(512.0, 2.0, 1.0),
+  vec3(512.0, 2.0, 1.0)
+);
 
 // gl_FragCoord is available natively, but some ST shaders reference
 // fragCoord from mainImage params — that's handled by the main() wrapper.
@@ -62,19 +85,73 @@ const vec4 iDate = vec4(2025.0, 1.0, 1.0, 0.0);
 // iSampleRate stub
 const float iSampleRate = 44100.0;
 
+// iChannelTime stubs (per-channel playback time)
+float iChannelTime[4] = float[4](iTime, iTime, iTime, iTime);
+
 `;
+
+// ──────────────────────────────────────────────────────────────────────
+// Multi-pass detection and handling
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Find all mainImage function definitions in the code.
+ * Returns their positions (start index of the match).
+ */
+function findMainImageDefs(code: string): { index: number; length: number }[] {
+  const results: { index: number; length: number }[] = [];
+  const re = /void\s+mainImage\s*\(\s*out\s+vec4\s+\w+\s*,\s*in\s+vec2\s+\w+\s*\)/g;
+  let match;
+  while ((match = re.exec(code)) !== null) {
+    results.push({ index: match.index, length: match[0].length });
+  }
+  return results;
+}
+
+/**
+ * For multi-pass ShaderToy shaders (multiple mainImage definitions),
+ * rename all but the last one to _mainImage_passN.
+ *
+ * The last mainImage is treated as the "Image" pass (final output).
+ * Earlier passes become helper functions that the Image pass may call,
+ * but since we don't have multi-buffer support, they'll mostly be
+ * dead code — which is fine, it just needs to compile.
+ */
+function handleMultiPass(code: string): string {
+  const defs = findMainImageDefs(code);
+  if (defs.length <= 1) return code;
+
+  // Rename all but the last mainImage
+  // Work backwards to preserve string indices
+  let result = code;
+  for (let i = defs.length - 2; i >= 0; i--) {
+    const def = defs[i];
+    // Replace "void mainImage" with "void _mainImage_passN"
+    const before = result.slice(0, def.index);
+    const signature = result.slice(def.index, def.index + def.length);
+    const after = result.slice(def.index + def.length);
+    const renamed = signature.replace('mainImage', `_mainImage_pass${i}`);
+    result = before + renamed + after;
+  }
+
+  return result;
+}
 
 /**
  * Wraps ShaderToy code so it compiles under NewAmp's pipeline.
  *
- * 1. Injects the compatibility preamble.
- * 2. Replaces references to the vec3 iResolution with our shim.
- * 3. Appends a main() that calls mainImage(fragColor, gl_FragCoord.xy).
+ * 1. Handles multi-pass shaders (renames extra mainImage defs).
+ * 2. Injects the compatibility preamble.
+ * 3. Replaces references to the vec3 iResolution with our shim.
+ * 4. Appends a main() that calls mainImage(fragColor, gl_FragCoord.xy).
  */
 export function wrapShaderToyCode(stCode: string): string {
+  // Handle multiple mainImage definitions (multi-pass/multi-buffer)
+  let adapted = handleMultiPass(stCode);
+
   // Replace bare iResolution references with the vec3 shim,
   // but not inside our own preamble (which uses iResolution directly).
-  let adapted = stCode.replace(/\biResolution\b/g, 'iResolution_ST');
+  adapted = adapted.replace(/\biResolution\b/g, 'iResolution_ST');
 
   // Replace iFrame with the int shim where it appears in user code
   adapted = adapted.replace(/\biFrame\b/g, 'iFrame_ST');
