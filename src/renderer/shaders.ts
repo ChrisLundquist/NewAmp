@@ -1,6 +1,8 @@
 export interface Preset {
   name: string;
   fragmentShader: string;
+  /** Optional: 'shadertoy' | 'milkdrop' for imported presets. */
+  format?: string;
 }
 
 /** Shared vertex shader — draws a fullscreen quad via triangle strip. */
@@ -636,3 +638,9 @@ void main() {
 `,
   },
 ];
+
+// ── ShaderToy-format presets (auto-wrapped via compatibility adapter) ──
+import { shaderToyPresets } from '../compat/presets-shadertoy';
+for (const stPreset of shaderToyPresets) {
+  presets.push(stPreset);
+}

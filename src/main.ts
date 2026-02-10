@@ -5,6 +5,7 @@ import { ShaderEditor } from './editor/editor';
 import { PresetManager } from './editor/preset-manager';
 import { UniformInspector } from './editor/inspector';
 import type { LiveContext } from './editor/uniforms';
+import { createImportDialog, type ImportResult } from './compat/import-dialog';
 
 /* ── DOM refs ── */
 const canvas          = document.getElementById('viz-canvas')      as HTMLCanvasElement;
@@ -33,6 +34,7 @@ const monacoContainer = document.getElementById('monaco-container') as HTMLDivEl
 const inspectorEl     = document.getElementById('uniform-inspector') as HTMLDivElement;
 const renderScaleSlider = document.getElementById('render-scale')  as HTMLInputElement | null;
 const renderScaleLabel  = document.getElementById('render-scale-value') as HTMLSpanElement | null;
+const importCompatBtn   = document.getElementById('import-compat')  as HTMLButtonElement;
 
 /* ── Core objects ── */
 const audio          = new AudioEngine();
@@ -281,6 +283,19 @@ importPresetIn.addEventListener('change', async () => {
     if (!editorOpen) toggleEditor(true);
   }
   importPresetIn.value = '';
+});
+
+/* ── ShaderToy / MilkDrop Import ── */
+const importDialog = createImportDialog((result: ImportResult) => {
+  // Save the converted shader as a new user preset
+  const key = presetManager.saveNew(result.name, result.code);
+  rebuildPresetSelect(key);
+  applyPresetByKey(key);
+  if (!editorOpen) toggleEditor(true);
+});
+
+importCompatBtn.addEventListener('click', () => {
+  importDialog.show();
 });
 
 /* ── Preset selector ── */
