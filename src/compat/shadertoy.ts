@@ -66,15 +66,8 @@ const vec4 iMouse = vec4(0.0);
 #define iChannel3 iChannel0
 
 // ShaderToy's iChannelResolution — array of vec3 for all 4 channels.
-// channel 0: 512×2 audio texture
-// channel 1: backbuffer (approximate with viewport resolution)
-// channel 2/3: same as channel 0
-vec3 iChannelResolution[4] = vec3[4](
-  vec3(512.0, 2.0, 1.0),
-  vec3(iResolution, 1.0),
-  vec3(512.0, 2.0, 1.0),
-  vec3(512.0, 2.0, 1.0)
-);
+// Initialized in main() because iResolution is a uniform (not a constant expression).
+vec3 iChannelResolution[4];
 
 // gl_FragCoord is available natively, but some ST shaders reference
 // fragCoord from mainImage params — that's handled by the main() wrapper.
@@ -86,7 +79,8 @@ const vec4 iDate = vec4(2025.0, 1.0, 1.0, 0.0);
 const float iSampleRate = 44100.0;
 
 // iChannelTime stubs (per-channel playback time)
-float iChannelTime[4] = float[4](iTime, iTime, iTime, iTime);
+// Initialized in main() because iTime is a uniform (not a constant expression).
+float iChannelTime[4];
 
 `;
 
@@ -164,6 +158,15 @@ export function wrapShaderToyCode(stCode: string): string {
 
 // ── ShaderToy entry-point bridge ──
 void main() {
+  // Initialize arrays that depend on uniforms (can't be global initializers in GLSL ES).
+  iChannelResolution[0] = vec3(512.0, 2.0, 1.0);
+  iChannelResolution[1] = vec3(iResolution, 1.0);
+  iChannelResolution[2] = vec3(512.0, 2.0, 1.0);
+  iChannelResolution[3] = vec3(512.0, 2.0, 1.0);
+  iChannelTime[0] = iTime;
+  iChannelTime[1] = iTime;
+  iChannelTime[2] = iTime;
+  iChannelTime[3] = iTime;
   mainImage(fragColor, gl_FragCoord.xy);
 }
 `
